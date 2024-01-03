@@ -1,16 +1,62 @@
 import random
 from hangman_words import word_list
-from hangman_art import logo, stages
+from hangman_art import logo, send_logo, stages, send_stages
 from hangman_ranking import save_score, print_ranking
+import socket
+import pickle
+import struct
+
+#variables to send
+put_name = {
+    1: "Put tour name: "
+}
+
+welcome_page = {
+    1: "1. Start new game",
+    2: "2. Show ranking",
+    3: "3. Quit",
+    4: "Choose an option: "
+}
+
+text = {
+    1: "Guess a letter: "
+}
+
+#networking part
+MULTICAST_GROUP = '224.1.1.1'
+MULTICAST_PORT = 1234
+
+sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+sock.bind(('0.0.0.0', MULTICAST_PORT))
+group = socket.inet_aton(MULTICAST_GROUP)
+sock.setsockopt(socket.IPPROTO_IP, socket.IP_ADD_MEMBERSHIP, struct.pack('4sL',group, socket.INADDR_ANY))
+
 
 def main_menu():
+    print("Multicast Server is ready...")
+    message, client_address = receive()
+
+    print(f"Received from {client_address}: {message}")
+    client_name = message['client_id']
+    print(client_name)
+    print(client_address)
     while True:
+
         print("1. Start new game")
         print("2. Show ranking")
         print("3. Quit")
-        choice = input("Choose an option: ")
+
+        send(welcome_page, client_address)
+
+        response, _ = receive()
+
+        choice = response['message']
+
+
+        #choice = input("Choose an option: ")
+
         if choice == '1':
-            start_game()
+            start_game(client_name, client_address)
         elif choice == '2':
             print_ranking()
         elif choice == '3':
@@ -18,8 +64,19 @@ def main_menu():
         else:
             print("Invalid option. Please try again.")
 
-def start_game():
-    player_name = input("Enter your name: ")
+def receive():
+    data, client_address = sock.recvfrom(1024)
+    message = pickle.loads(data)
+    return message, client_address
+
+def send(message, client_address):
+    data = pickle.dumps(message)
+    sock.sendto(data, client_address)
+
+def start_game(client_name, client_address):
+    # player_name = input("Enter your name: ")
+    print(f"Imię: {client_name}")
+    send(send_logo, client_address)
     print(logo)
 
     chosen_word = random.choice(word_list)
@@ -35,10 +92,13 @@ def start_game():
     guessed_letters = []
 
     while not end_of_game:
-        guess = input("Guess a letter: ").lower()
-
+        # guess = input("Guess a letter: ").lower()
+        send(text, client_address)
+        letter, _ = receive()
+        guess = letter['message']
         if guess in guessed_letters:
-            print("You've already guessed this letter.")
+           #print("You've already guessed this letter.")
+            send("You've already guessed this letter.", client_address)
         else:
             guessed_letters.append(guess)
 
@@ -61,8 +121,8 @@ def start_game():
             print("You win.")
 
         print(stages[lives])
-
-    save_score(player_name, lives)
+        send(send_stages[1][lives], client_address)
+    save_score(client_name, lives)
 
 if __name__ == "__main__":
     main_menu()

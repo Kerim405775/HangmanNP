@@ -1,2 +1,6 @@
 Miro,6
 miro,0
+kuba,0
+kuba1,2
+klient_test,3
+klient_test2,0

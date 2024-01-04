@@ -48,8 +48,11 @@ def main_menu():
         if choice == '1':
             start_game(client_name, client_address)
         elif choice == '2':
+           ranking_str = ""
            ranking = print_ranking()
-           send(ranking, client_address)
+           for name, score in ranking.items():
+               ranking_str = ranking_str + f"{name}: {score}\n"
+           send(ranking_str, client_address)
         elif choice == '3':
             break
         else:

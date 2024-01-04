@@ -1,68 +1,112 @@
-import random
-from hangman_words import word_list
-from hangman_art import logo, stages
-from hangman_ranking import save_score, print_ranking
+import socket
+import pickle
+import struct
 
-def main_menu():
-    while True:
-        print("1. Start new game")
-        print("2. Show ranking")
-        print("3. Quit")
-        choice = input("Choose an option: ")
-        if choice == '1':
-            start_game()
-        elif choice == '2':
-            print_ranking()
-        elif choice == '3':
-            break
-        else:
-            print("Invalid option. Please try again.")
+# Multicast group information
+MULTICAST_GROUP = '224.1.1.1'
+MULTICAST_PORT = 1234
 
-def start_game():
-    player_name = input("Enter your name: ")
-    print(logo)
+# Client
+class MulticastClient:
+    def __init__(self, client_id):
+        self.client_socket = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+        self.client_socket.settimeout(5)
+        self.client_id = client_id
 
-    chosen_word = random.choice(word_list)
-    word_length = len(chosen_word)
+    def start(self):
+        self.join_group()
 
-    end_of_game = False
-    lives = 6
+        while True:
 
-    display = []
-    for _ in range(word_length):
-        display += "_"
 
-    guessed_letters = []
+            message = input("Enter a message: ")
+            if message.lower() == 'exit':
+                break
 
-    while not end_of_game:
-        guess = input("Guess a letter: ").lower()
+            # Send a message to the server
+            self.send({"client_id": self.client_id, "message": message})
 
-        if guess in guessed_letters:
-            print("You've already guessed this letter.")
-        else:
-            guessed_letters.append(guess)
+            # Receive and display the acknowledgment from the server
+            response = self.receive()
+            print(response)
+            # if response is not None:
+            #     print(f"Received from server: {response}")
 
-            for position in range(word_length):
-                letter = chosen_word[position]
-                if letter == guess:
-                    display[position] = letter
+    def join_group(self):
+        group = socket.inet_aton(MULTICAST_GROUP)
+        self.client_socket.setsockopt(socket.IPPROTO_IP, socket.IP_ADD_MEMBERSHIP, struct.pack('4sL', group, socket.INADDR_ANY))
 
-            if guess not in chosen_word:
-                print("This letter is not in the word.")
-                lives -= 1
-                if lives == 0:
-                    end_of_game = True
-                    print("You lose.")
+    def receive(self):
+        try:
+            data, _ = self.client_socket.recvfrom(1024)
+            message = pickle.loads(data)
+            return message
 
-        print(f"{' '.join(display)}")
+        except socket.timeout:
+            print("TimeoutError: No data received from the server.")
+            return None
 
-        if "_" not in display:
-            end_of_game = True
-            print("You win.")
-
-        print(stages[lives])
-
-    save_score(player_name, lives)
+    def send(self, message):
+        data = pickle.dumps(message)
+        self.client_socket.sendto(data, (MULTICAST_GROUP, MULTICAST_PORT))
 
 if __name__ == "__main__":
-    main_menu()
+    client_id = input("Enter client ID: ")
+    client = MulticastClient(client_id)
+    client.start()
+import socket
+import pickle
+import struct
+
+# Multicast group information
+MULTICAST_GROUP = '224.1.1.1'
+MULTICAST_PORT = 1234
+
+# Client
+class MulticastClient:
+    def __init__(self, client_id):
+        self.client_socket = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+        self.client_socket.settimeout(5)
+        self.client_id = client_id
+
+    def start(self):
+        self.join_group()
+
+        while True:
+
+
+            message = input("Enter a message: ")
+            if message.lower() == 'exit':
+                break
+
+            # Send a message to the server
+            self.send({"client_id": self.client_id, "message": message})
+
+            # Receive and display the acknowledgment from the server
+            response = self.receive()
+            print(response)
+            # if response is not None:
+            #     print(f"Received from server: {response}")
+
+    def join_group(self):
+        group = socket.inet_aton(MULTICAST_GROUP)
+        self.client_socket.setsockopt(socket.IPPROTO_IP, socket.IP_ADD_MEMBERSHIP, struct.pack('4sL', group, socket.INADDR_ANY))
+
+    def receive(self):
+        try:
+            data, _ = self.client_socket.recvfrom(1024)
+            message = pickle.loads(data)
+            return message
+
+        except socket.timeout:
+            print("TimeoutError: No data received from the server.")
+            return None
+
+    def send(self, message):
+        data = pickle.dumps(message)
+        self.client_socket.sendto(data, (MULTICAST_GROUP, MULTICAST_PORT))
+
+if __name__ == "__main__":
+    client_id = input("Enter client ID: ")
+    client = MulticastClient(client_id)
+    client.start()

@@ -1,26 +1,11 @@
 import random
 from hangman_words import word_list
-from hangman_art import logo, send_logo, stages, send_stages
+from hangman_art import logo, stages
 from hangman_ranking import save_score, print_ranking
 import socket
 import pickle
 import struct
 
-#variables to send
-put_name = {
-    1: "Put tour name: "
-}
-
-welcome_page = {
-    1: "1. Start new game",
-    2: "2. Show ranking",
-    3: "3. Quit",
-    4: "Choose an option: "
-}
-
-text = {
-    1: "Guess a letter: "
-}
 
 #networking part
 MULTICAST_GROUP = '224.1.1.1'
@@ -46,7 +31,12 @@ def main_menu():
         print("2. Show ranking")
         print("3. Quit")
 
-        send(welcome_page, client_address)
+        send("""
+    1. Start new game
+    2. Show ranking
+    3. Quit
+    Choose an option:
+            """, client_address)
 
         response, _ = receive()
 
@@ -58,11 +48,13 @@ def main_menu():
         if choice == '1':
             start_game(client_name, client_address)
         elif choice == '2':
-            print_ranking()
+           ranking = print_ranking()
+           send(ranking, client_address)
         elif choice == '3':
             break
         else:
             print("Invalid option. Please try again.")
+            send("Invalid option. Please try again.", client_address)
 
 def receive():
     data, client_address = sock.recvfrom(1024)
@@ -75,8 +67,9 @@ def send(message, client_address):
 
 def start_game(client_name, client_address):
     # player_name = input("Enter your name: ")
-    print(f"Imię: {client_name}")
-    send(send_logo, client_address)
+    print(f"Name: {client_name}")
+    send(f"Your name is: {client_name}", client_address)
+    send(logo, client_address)
     print(logo)
 
     chosen_word = random.choice(word_list)
@@ -93,11 +86,11 @@ def start_game(client_name, client_address):
 
     while not end_of_game:
         # guess = input("Guess a letter: ").lower()
-        send(text, client_address)
+        send('Guess a letter', client_address)
         letter, _ = receive()
-        guess = letter['message']
+        guess = letter['message'].lower()
         if guess in guessed_letters:
-           #print("You've already guessed this letter.")
+            print("You've already guessed this letter.")
             send("You've already guessed this letter.", client_address)
         else:
             guessed_letters.append(guess)
@@ -109,19 +102,22 @@ def start_game(client_name, client_address):
 
             if guess not in chosen_word:
                 print("This letter is not in the word.")
+                send("This letter is not in the word.", client_address)
                 lives -= 1
                 if lives == 0:
                     end_of_game = True
                     print("You lose.")
+                    send("You lose", client_address)
 
         print(f"{' '.join(display)}")
-
+        send(f"{' '.join(display)}", client_address)
         if "_" not in display:
             end_of_game = True
             print("You win.")
+            send("You win", client_address)
 
         print(stages[lives])
-        send(send_stages[1][lives], client_address)
+        send(stages[lives], client_address)
     save_score(client_name, lives)
 
 if __name__ == "__main__":

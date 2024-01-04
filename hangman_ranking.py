@@ -13,6 +13,10 @@ def get_scores():
 
 def print_ranking():
     scores = get_scores()
+    send_scores = {}
     scores.sort(key=lambda x: x[1], reverse=True)
     for player_name, score in scores:
+        send_scores[player_name] = score
         print(f'{player_name}: {score}')
+    return  send_scores
+

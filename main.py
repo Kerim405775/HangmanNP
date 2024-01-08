@@ -12,7 +12,7 @@ MULTICAST_PORT = 1234
 class MulticastClient:
     def __init__(self, client_id):
         self.client_socket = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-        self.client_socket.settimeout(5)
+        self.client_socket.settimeout(2)
         self.client_id = client_id
 
     def start(self):

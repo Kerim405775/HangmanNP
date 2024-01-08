@@ -6,6 +6,8 @@ import struct
 MULTICAST_GROUP = '224.1.1.1'
 MULTICAST_PORT = 1234
 
+
+
 # Client
 class MulticastClient:
     def __init__(self, client_id):
@@ -27,8 +29,9 @@ class MulticastClient:
             self.send({"client_id": self.client_id, "message": message})
 
             # Receive and display the acknowledgment from the server
-            response = self.receive()
-            print(response)
+            responses = self.receivemultiple()
+            for response in responses:
+                print(response)
             # if response is not None:
             #     print(f"Received from server: {response}")
 
@@ -46,6 +49,18 @@ class MulticastClient:
             print("TimeoutError: No data received from the server.")
             return None
 
+    def receivemultiple(self):
+        responses = []
+        while True:
+            try:
+                data, _ = self.client_socket.recvfrom(1024)
+                message = pickle.loads(data)
+                responses.append(message)
+            except socket.timeout:
+                break
+        if not responses:
+            print("TimeoutError: No data received from the server.")
+        return responses
     def send(self, message):
         data = pickle.dumps(message)
         self.client_socket.sendto(data, (MULTICAST_GROUP, MULTICAST_PORT))

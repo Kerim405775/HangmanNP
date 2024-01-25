@@ -76,6 +76,11 @@ def start_game(connection, client_address):
                             lives -= 1
                             if lives == 0:
                                 end_of_game = True
+
+                        # Dodajemy nowy warunek sprawdzający, czy gracz odgadł wszystkie litery
+                        if "_" not in display:
+                            end_of_game = True
+                            result = "You win!"
                 else:
                     connection.sendall(pickle.dumps("Please enter a single alphabetical letter."))
             except EOFError:
@@ -84,7 +89,7 @@ def start_game(connection, client_address):
         else:
             end_of_game = True
 
-        # Wyświetlanie stanu gry po stronie serwera
+            # Wyświetlanie stanu gry po stronie serwera
         print(f"Stan gry dla {client_address}: {' '.join(display)} - Pozostałe życia: {lives}")
 
     if end_of_game:

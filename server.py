@@ -96,7 +96,10 @@ def start_game(connection, client_address):
         player_name = str(client_address[1])  # Tutaj używamy adresu klienta jako nazwy, możesz to zmienić na coś bardziej unikalnego
         save_score(player_name, lives)
         ranking = print_ranking()
-        connection.sendall(pickle.dumps(ranking))
+        send_ranking=""
+        for name, score in ranking.items():
+            send_ranking = send_ranking + f"{name}: {score}\n"
+        connection.sendall(pickle.dumps(send_ranking))
 
     connection.close()  # Zamknij połączenie po zakończeniu gry
 def update_ranking(client_address, lives):

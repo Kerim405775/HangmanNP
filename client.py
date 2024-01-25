@@ -2,70 +2,62 @@ import socket
 import pickle
 import struct
 
-# Multicast group information
+# Ustawienia multicastu
 MULTICAST_GROUP = '224.1.1.1'
 MULTICAST_PORT = 1234
+BUFFER_SIZE = 1024
 
 
+# Funkcja do wyszukiwania serwera za pomocą multicastu
+def find_server():
+    multicast_sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM, socket.IPPROTO_UDP)
+    multicast_sock.settimeout(2)
 
-# Client
-class MulticastClient:
-    def __init__(self, client_id):
-        self.client_socket = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-        self.client_socket.settimeout(2)
-        self.client_id = client_id
+    # Dołączanie do grupy multicastowej
+    group = socket.inet_aton(MULTICAST_GROUP)
+    mreq = struct.pack('4sL', group, socket.INADDR_ANY)
+    multicast_sock.setsockopt(socket.IPPROTO_IP, socket.IP_ADD_MEMBERSHIP, mreq)
 
-    def start(self):
-        self.join_group()
+    try:
+        # Wysyłanie zapytania o serwer
+        message = {'request': 'DISCOVER_SERVER'}
+        multicast_sock.sendto(pickle.dumps(message), (MULTICAST_GROUP, MULTICAST_PORT))
+        data, _ = multicast_sock.recvfrom(BUFFER_SIZE)
+        response = pickle.loads(data)
+        return response['tcp_port']
+    except socket.timeout:
+        print("Nie znaleziono serwera.")
+        return None
 
+
+# Funkcja do łączenia się z serwerem i rozpoczęcia gry
+def start_game(tcp_port):
+    with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as sock:
+        sock.connect(('localhost', tcp_port))
         while True:
-
-
-            message = input("Enter a message: ")
-            if message.lower() == 'exit':
+            data = sock.recv(BUFFER_SIZE)
+            if not data:
+                print("No data received from the server. Exiting.")
                 break
-
-            # Send a message to the server
-            self.send({"client_id": self.client_id, "message": message})
-
-            # Receive and display the acknowledgment from the server
-            responses = self.receivemultiple()
-            for response in responses:
-                print(response)
-            # if response is not None:
-            #     print(f"Received from server: {response}")
-
-    def join_group(self):
-        group = socket.inet_aton(MULTICAST_GROUP)
-        self.client_socket.setsockopt(socket.IPPROTO_IP, socket.IP_ADD_MEMBERSHIP, struct.pack('4sL', group, socket.INADDR_ANY))
-
-    def receive(self):
-        try:
-            data, _ = self.client_socket.recvfrom(1024)
             message = pickle.loads(data)
-            return message
+            print(message)
 
-        except socket.timeout:
-            print("TimeoutError: No data received from the server.")
-            return None
+            if "Guess a letter" in message:
+                while True:  # Pętla do walidacji wprowadzonej litery
+                    guess = input("Twoja litera: ").lower()
+                    if len(guess) == 1 and guess.isalpha():  # Sprawdzenie czy wprowadzony znak to jedna litera
+                        print(f"Wysyłam literę {guess} do serwera...")
+                        sock.sendall(pickle.dumps(guess))
+                        break  # Wyjście z pętli walidacji po poprawnym wprowadzeniu
+                    else:
+                        print("Please enter a single alphabetical letter.")  # Komunikat o błędzie
 
-    def receivemultiple(self):
-        responses = []
-        while True:
-            try:
-                data, _ = self.client_socket.recvfrom(1024)
-                message = pickle.loads(data)
-                responses.append(message)
-            except socket.timeout:
-                break
-        if not responses:
-            print("TimeoutError: No data received from the server.")
-        return responses
-    def send(self, message):
-        data = pickle.dumps(message)
-        self.client_socket.sendto(data, (MULTICAST_GROUP, MULTICAST_PORT))
 
 if __name__ == "__main__":
-    client_id = input("Enter client ID: ")
-    client = MulticastClient(client_id)
-    client.start()
+    print("Szukam serwera...")
+    server_port = find_server()
+    if server_port:
+        print(f"Znaleziono serwer. Łączę się na porcie {server_port}...")
+        start_game(server_port)
+    else:
+        print("Nie można połączyć się z serwerem.")

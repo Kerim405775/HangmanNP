@@ -1,22 +1,29 @@
-def save_score(player_name, score):
-    with open('scores.txt', 'a') as file:
-        file.write(f'{player_name},{score}\n')
+def save_score(client_port, score):
+    """Zapisuje wynik gracza do pliku rankingowego."""
+    with open('ranking.txt', 'a') as file:
+        file.write(f'{client_port},{score}\n')
 
 def get_scores():
-    with open('scores.txt', 'r') as file:
+    """Pobiera wyniki z pliku rankingowego i zwraca je jako listę tupli."""
+    with open('ranking.txt', 'r') as file:
         lines = file.readlines()
     scores = []
     for line in lines:
-        player_name, score = line.strip().split(',')
-        scores.append((player_name, int(score)))
+        parts = line.strip().split(',')
+        if len(parts) >= 2:
+            player_info, score = parts[0], parts[-1]
+            try:
+                score = int(score)
+                scores.append((player_info, score))
+            except ValueError:
+                print(f"Niepoprawny format punktów w linii: {line.strip()}")
+        else:
+            print(f"Niepoprawna linia w pliku rankingowym: {line.strip()}")
     return scores
 
 def print_ranking():
+    """Wypisuje ranking na podstawie wyników w pliku rankingowym i zwraca jako string."""
     scores = get_scores()
-    send_scores = {}
-    scores.sort(key=lambda x: x[1], reverse=True)
-    for player_name, score in scores:
-        send_scores[player_name] = score
-        print(f'{player_name}: {score}')
-    return  send_scores
-
+    scores.sort(key=lambda x: x[1], reverse=True)  # Sortowanie wyników od najwyższego do najniższego.
+    ranking_string = "\n".join(f"{player_name}: {score}" for player_name, score in scores)
+    return ranking_string

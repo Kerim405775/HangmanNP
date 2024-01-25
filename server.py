@@ -1,127 +1,124 @@
+import socket
+import struct
+import pickle
 import random
+import threading
 from hangman_words import word_list
 from hangman_art import logo, stages
-from hangman_ranking import save_score, print_ranking
-import socket
-import pickle
-import struct
+from hangman_ranking import print_ranking, save_score
 
-
-#networking part
+# Ustawienia multicastu
 MULTICAST_GROUP = '224.1.1.1'
 MULTICAST_PORT = 1234
 
-sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-sock.bind(('0.0.0.0', MULTICAST_PORT))
+# Ustawienia serwera TCP
+TCP_IP = '0.0.0.0'
+TCP_PORT = 12345
+BUFFER_SIZE = 1024
+
+# Tworzenie gniazda multicastowego
+multicast_sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM, socket.IPPROTO_UDP)
+multicast_sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+multicast_sock.bind(('', MULTICAST_PORT))
+
+# Ustawienia TTL dla pakietów multicastowych
+ttl = struct.pack('b', 1)
+multicast_sock.setsockopt(socket.IPPROTO_IP, socket.IP_MULTICAST_TTL, ttl)
+
+# Dołączanie do grupy multicastowej
 group = socket.inet_aton(MULTICAST_GROUP)
-sock.setsockopt(socket.IPPROTO_IP, socket.IP_ADD_MEMBERSHIP, struct.pack('4sL',group, socket.INADDR_ANY))
+mreq = struct.pack('4sL', group, socket.INADDR_ANY)
+multicast_sock.setsockopt(socket.IPPROTO_IP, socket.IP_ADD_MEMBERSHIP, mreq)
 
-
-def main_menu():
-    print("Multicast Server is ready...")
-    message, client_address = receive()
-
-    print(f"Received from {client_address}: {message}")
-    client_name = message['client_id']
-    print(client_name)
-    print(client_address)
+# Funkcja do odbierania zapytań od klientów i wysyłania odpowiedzi
+def multicast_response():
     while True:
+        print("Czekam na zapytania od klientów...")
+        data, addr = multicast_sock.recvfrom(1024)
+        message = pickle.loads(data)
+        if message['request'] == 'DISCOVER_SERVER':
+            response = {'response': 'SERVER_HERE', 'tcp_port': TCP_PORT}
+            multicast_sock.sendto(pickle.dumps(response), addr)
+            print(f"Odpowiedziałem klientowi {addr} z informacją o serwerze.")
 
-        print("1. Start new game")
-        print("2. Show ranking")
-        print("3. Quit")
-
-        send("""
-    1. Start new game
-    2. Show ranking
-    3. Quit
-    Choose an option:
-            """, client_address)
-
-        response, _ = receive()
-
-        choice = response['message']
-
-
-        #choice = input("Choose an option: ")
-
-        if choice == '1':
-            start_game(client_name, client_address)
-        elif choice == '2':
-           ranking_str = ""
-           ranking = print_ranking()
-           for name, score in ranking.items():
-               ranking_str = ranking_str + f"{name}: {score}\n"
-           send(ranking_str, client_address)
-        elif choice == '3':
-            break
-        else:
-            print("Invalid option. Please try again.")
-            send("Invalid option. Please try again.", client_address)
-
-def receive():
-    data, client_address = sock.recvfrom(1024)
-    message = pickle.loads(data)
-    return message, client_address
-
-def send(message, client_address):
-    data = pickle.dumps(message)
-    sock.sendto(data, client_address)
-
-def start_game(client_name, client_address):
-    # player_name = input("Enter your name: ")
-    print(f"Name: {client_name}")
-    send(f"Your name is: {client_name}", client_address)
-    send(logo, client_address)
-    print(logo)
-
+# Logika gry
+def start_game(connection, client_address):
+    connection.sendall(pickle.dumps(logo))
     chosen_word = random.choice(word_list)
     word_length = len(chosen_word)
-
     end_of_game = False
     lives = 6
-
-    display = []
-    for _ in range(word_length):
-        display += "_"
-
+    display = ['_'] * word_length
     guessed_letters = []
 
     while not end_of_game:
-        # guess = input("Guess a letter: ").lower()
-        send('Guess a letter', client_address)
-        letter, _ = receive()
-        guess = letter['message'].lower()
-        if guess in guessed_letters:
-            print("You've already guessed this letter.")
-            send("You've already guessed this letter.", client_address)
+        game_state = f"{' '.join(display)}\n{stages[lives]}"
+        prompt = "Guess a letter" if lives > 0 else "Game over"
+        connection.sendall(pickle.dumps(f"{game_state}\n{prompt}"))
+
+        if lives > 0:
+            try:
+                guess_data = connection.recv(BUFFER_SIZE)
+                if not guess_data:
+                    break  # Jeśli nie otrzymaliśmy danych, zakończ pętlę
+                guess = pickle.loads(guess_data).lower()
+
+                if len(guess) == 1 and guess.isalpha():
+                    if guess in guessed_letters:
+                        connection.sendall(pickle.dumps("You've already guessed this letter."))
+                    else:
+                        guessed_letters.append(guess)
+                        if guess in chosen_word:
+                            for position in range(word_length):
+                                if chosen_word[position] == guess:
+                                    display[position] = guess
+                        else:
+                            lives -= 1
+                            if lives == 0:
+                                end_of_game = True
+                else:
+                    connection.sendall(pickle.dumps("Please enter a single alphabetical letter."))
+            except EOFError:
+                # Klient nieoczekiwanie rozłączył się
+                break
         else:
-            guessed_letters.append(guess)
-
-            for position in range(word_length):
-                letter = chosen_word[position]
-                if letter == guess:
-                    display[position] = letter
-
-            if guess not in chosen_word:
-                print("This letter is not in the word.")
-                send("This letter is not in the word.", client_address)
-                lives -= 1
-                if lives == 0:
-                    end_of_game = True
-                    print("You lose.")
-                    send("You lose", client_address)
-
-        print(f"{' '.join(display)}")
-        send(f"{' '.join(display)}", client_address)
-        if "_" not in display:
             end_of_game = True
-            print("You win.")
-            send("You win", client_address)
 
-        print(stages[lives])
-        send(stages[lives], client_address)
-    save_score(client_name, lives)
+        # Wyświetlanie stanu gry po stronie serwera
+        print(f"Stan gry dla {client_address}: {' '.join(display)} - Pozostałe życia: {lives}")
+
+    if end_of_game:
+        result = "You win!" if "_" not in display else f"You lose.\nThe word was {chosen_word}."
+        connection.sendall(pickle.dumps(result))
+        print(f"Wynik gry dla {client_address}: {result}")
+
+        # Zapisz wynik do rankingu i wyślij aktualny ranking do klienta
+        player_name = str(client_address[1])  # Tutaj używamy adresu klienta jako nazwy, możesz to zmienić na coś bardziej unikalnego
+        save_score(player_name, lives)
+        ranking = print_ranking()
+        connection.sendall(pickle.dumps(ranking))
+
+    connection.close()  # Zamknij połączenie po zakończeniu gry
+def update_ranking(client_address, lives):
+    score = lives * 10  # Przykładowe obliczenie punktów
+    with open("ranking.txt", "a") as ranking_file:
+        ranking_file.write(f"{client_address[1]}: {score}\n") # Zamknij połączenie po zakończeniu gry
+
+
+# Główna funkcja serwera
+def server_main():
+    server_sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+    server_sock.bind((TCP_IP, TCP_PORT))
+    server_sock.listen(5)
+    print(f"TCP Server listening on {TCP_IP}:{TCP_PORT}")
+
+    # Uruchomienie wątku obsługi multicastu
+    threading.Thread(target=multicast_response, daemon=True).start()
+
+    while True:
+        conn, addr = server_sock.accept()
+        print('Connection address:', addr)
+        threading.Thread(target=start_game, args=(conn, addr)).start()
 
 if __name__ == "__main__":
-    main_menu()
+    server_main()

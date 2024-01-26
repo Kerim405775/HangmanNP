@@ -7,25 +7,25 @@ from hangman_words import word_list
 from hangman_art import logo, stages
 from hangman_ranking import print_ranking, save_score
 
-# Ustawienia multicastu
+# Ustawienia multicastu - używane do komunikacji grupowej i odkrycia serwera przez klientów.
 MULTICAST_GROUP = '224.1.1.1'
 MULTICAST_PORT = 1234
 
-# Ustawienia serwera TCP
+# Ustawienia serwera TCP - nasłuchiwanie na wszystkich dostępnych interfejsach sieciowych.
 TCP_IP = '0.0.0.0'
 TCP_PORT = 12345
 BUFFER_SIZE = 1024
 
-# Tworzenie gniazda multicastowego
+# Tworzenie gniazda multicastowego - umożliwia odbiór komunikatów multicast od klientów.
 multicast_sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM, socket.IPPROTO_UDP)
 multicast_sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
 multicast_sock.bind(('', MULTICAST_PORT))
 
-# Ustawienia TTL dla pakietów multicastowych
+# Ustawienia TTL (Time-To-Live) dla pakietów multicastowych.
 ttl = struct.pack('b', 1)
 multicast_sock.setsockopt(socket.IPPROTO_IP, socket.IP_MULTICAST_TTL, ttl)
 
-# Dołączanie do grupy multicastowej
+# Dołączanie do grupy multicastowej - umożliwia odbiór komunikatów z określonej grupy.
 group = socket.inet_aton(MULTICAST_GROUP)
 mreq = struct.pack('4sL', group, socket.INADDR_ANY)
 multicast_sock.setsockopt(socket.IPPROTO_IP, socket.IP_ADD_MEMBERSHIP, mreq)
@@ -41,7 +41,7 @@ def multicast_response():
             multicast_sock.sendto(pickle.dumps(response), addr)
             print(f"Odpowiedziałem klientowi {addr} z informacją o serwerze.")
 
-# Logika gry
+# Logika gry wisielca - zarządzanie stanem gry, komunikacją z klientem i logiką gry.
 def start_game(connection, client_address):
     connection.sendall(pickle.dumps(logo))
     chosen_word = random.choice(word_list)
@@ -110,15 +110,9 @@ def start_game(connection, client_address):
         save_score(player_name, lives)
         ranking = print_ranking()
         connection.sendall(pickle.dumps(ranking))
-
-        # Zamknij połączenie
     connection.close()  # Zamknij połączenie po zakończeniu gry
-def update_ranking(client_address, lives):
-    score = lives * 10  # Przykładowe obliczenie punktów
-    with open("ranking.txt", "a") as ranking_file:
-        ranking_file.write(f"{client_address[1]}: {score}\n") # Zamknij połączenie po zakończeniu gry
 
-# Główna funkcja serwera
+# Główna funkcja serwera - inicjalizacja i uruchomienie serwera TCP.
 def server_main():
     server_sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
     server_sock.bind((TCP_IP, TCP_PORT))

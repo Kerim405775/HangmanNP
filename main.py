@@ -39,16 +39,6 @@ class MulticastClient:
         group = socket.inet_aton(MULTICAST_GROUP)
         self.client_socket.setsockopt(socket.IPPROTO_IP, socket.IP_ADD_MEMBERSHIP, struct.pack('4sL', group, socket.INADDR_ANY))
 
-    def receive(self):
-        try:
-            data, _ = self.client_socket.recvfrom(1024)
-            message = pickle.loads(data)
-            return message
-
-        except socket.timeout:
-            print("TimeoutError: No data received from the server.")
-            return None
-
     def receivemultiple(self):
         responses = []
         while True:

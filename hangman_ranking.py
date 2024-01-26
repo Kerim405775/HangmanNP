@@ -24,6 +24,6 @@ def get_scores():
 def print_ranking():
     """Wypisuje ranking na podstawie wyników w pliku rankingowym i zwraca jako string."""
     scores = get_scores()
-    scores.sort(key=lambda x: x[1], reverse=True)  # Sortowanie wyników od najwyższego do najniższego.
+    scores.sort(key=lambda x: x[1], reverse=True)
     ranking_string = "\n".join(f"{player_name}: {score}" for player_name, score in scores)
     return ranking_string

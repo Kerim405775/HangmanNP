@@ -93,19 +93,25 @@ def start_game(connection, client_address):
         print(f"Stan gry dla {client_address}: {' '.join(display)} - Pozostałe życia: {lives}")
 
     if end_of_game:
-        result = "You win!" if "_" not in display else f"You lose.\nThe word was {chosen_word}."
-        connection.sendall(pickle.dumps(result))
-        print(f"Wynik gry dla {client_address}: {result}")
+        # Ustaw stan gry z pełnym słowem i wisielcem
+        full_state_display = ' '.join(chosen_word) if lives == 0 else ' '.join(display)
+        full_hangman = stages[lives]
+
+        # Utwórz pełny komunikat końcowy
+        result_message = "You win!" if "_" not in display else f"You lose.\nThe word was {chosen_word}."
+        full_message = f"{full_state_display}\n{full_hangman}\n{result_message}"
+
+        # Wyślij pełny komunikat końcowy do klienta
+        connection.sendall(pickle.dumps(full_message))
+        print(f"Wynik gry dla {client_address}: {result_message}")
 
         # Zapisz wynik do rankingu i wyślij aktualny ranking do klienta
-        player_name = str(client_address[1])  # Tutaj używamy adresu klienta jako nazwy, możesz to zmienić na coś bardziej unikalnego
+        player_name = str(client_address[1])  # Możesz zastąpić to bardziej unikalną identyfikacją
         save_score(player_name, lives)
         ranking = print_ranking()
-        send_ranking=""
-        for name, score in ranking.items():
-            send_ranking = send_ranking + f"{name}: {score}\n"
-        connection.sendall(pickle.dumps(send_ranking))
+        connection.sendall(pickle.dumps(ranking))
 
+        # Zamknij połączenie
     connection.close()  # Zamknij połączenie po zakończeniu gry
 def update_ranking(client_address, lives):
     score = lives * 10  # Przykładowe obliczenie punktów

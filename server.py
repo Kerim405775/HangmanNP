@@ -118,7 +118,6 @@ def update_ranking(client_address, lives):
     with open("ranking.txt", "a") as ranking_file:
         ranking_file.write(f"{client_address[1]}: {score}\n") # Zamknij połączenie po zakończeniu gry
 
-
 # Główna funkcja serwera
 def server_main():
     server_sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)

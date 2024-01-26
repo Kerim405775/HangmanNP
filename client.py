@@ -29,7 +29,6 @@ def find_server():
         print("Nie znaleziono serwera.")
         return None
 
-
 # Funkcja do łączenia się z serwerem i rozpoczęcia gry
 def start_game(tcp_port):
     with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as sock:
